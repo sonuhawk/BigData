@@ -1,17 +1,31 @@
-package org.bigdata
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{SparkSession, DataFrame}
 
-object one {
-  val df = sc.parallelize(Seq(
-    (0,"cat26",30.9), (0,"cat13",22.1), (0,"cat95",19.6), (0,"cat105",1.3),
-    (1,"cat67",28.5), (1,"cat4",26.8), (1,"cat13",12.6), (1,"cat23",5.3),
-    (2,"cat56",39.6), (2,"cat40",29.7), (2,"cat187",27.9), (2,"cat68",9.8),
-    (3,"cat8",35.6))).toDF("Hour", "Category", "TotalValue")
+// Create a SparkSession
+val spark: SparkSession = SparkSession.builder()
+  .appName("FirstRowInEachGroup")
+  .getOrCreate()
 
-  df.show()
+// Sample DataFrame with two columns: "group" and "value"
+val data = Seq(
+  (1, "A"),
+  (1, "B"),
+  (2, "C"),
+  (2, "D"),
+  (2, "E")
+)
 
-  val w = Window.partitionBy($"hour").orderBy($"TotalValue".desc)
+val df: DataFrame = spark.createDataFrame(data).toDF("group", "value")
 
-  val dfTop = df.withColumn("rn", row_number.over(w)).where($"rn" === 1).drop("rn")
+// Define a window specification over the "group" column
+val windowSpec = Window.partitionBy("group").orderBy("value")
 
-  dfTop.show
-}
+// Use the row_number function to assign a row number to each row within the partition
+val rankedDF = df.withColumn("row_number", row_number().over(windowSpec))
+
+// Filter rows where row_number is 1 to get the first row of each group
+val resultDF = rankedDF.filter(col("row_number") === 1)
+
+// Show the result
+resultDF.show()
